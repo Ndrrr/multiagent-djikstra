@@ -1,7 +1,10 @@
 package org.example;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
 
@@ -66,24 +69,30 @@ public class Main {
         nodeD.edges = List.of(edgeDE, edgeDF);
         nodeE.edges = List.of(edgeEF);
 
-        Agent agent007 = new Agent();
-        agent007.name = "007";
+        List<Agent> agents = new ArrayList<>();
+        nodeA.edges.forEach(edge -> {
+            Agent agent = Agent.fromEdgeAsync(edge);
+            agents.add(agent);
+        });
 
-        agent007.start(nodeA);
+        Runnable syncRunnable = () -> agents.forEach(agent -> agent.sync(agents));
 
-        // Display the shortest distances
-        for (Map.Entry<Node, Integer> entry : agent007.distances.entrySet()) {
-            System.out.println("Shortest distance from nodeA to " + entry.getKey() + ": " + entry.getValue());
-        }
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        executor.scheduleAtFixedRate(syncRunnable, 0, 3, TimeUnit.MILLISECONDS);
 
-        Agent agent009 = new Agent();
-        agent009.name = "009";
+        Runnable stopRunnableIfAllAgentsStopped = () -> {
+            if (agents.stream().allMatch(agent -> agent.stopped)) {
+                executor.shutdown();
+                System.out.println("All agents have stopped");
+                agents.forEach(agent -> {
+                    System.out.println("Agent " + agent.name + ": ");
+                    agent.distances.forEach((node, distance) ->
+                            System.out.println("Distance to " + node.name + ": " + distance));
+                });
+            }
+        };
 
-        agent009.start(nodeB);
-
-        // Display the shortest distances
-        for (Map.Entry<Node, Integer> entry : agent009.distances.entrySet()) {
-            System.out.println("Shortest distance from nodeB to " + entry.getKey() + ": " + entry.getValue());
-        }
+        executor.scheduleAtFixedRate(stopRunnableIfAllAgentsStopped, 0, 1, TimeUnit.SECONDS);
     }
+
 }
